@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<explainResponse xmlns="http://www.loc.gov/zing/srw/">
+  <version>1.2</version>
+  <record>
+    <recordSchema>http://explain.z3950.org/dtd/2.0/</recordSchema>
+    <recordPacking>xml</recordPacking>
+    <recordData>
+      <explain xmlns="http://explain.z3950.org/dtd/2.0/">
+        <serverInfo>
+          <host>www.lexml.gov.br</host>
+          <port>443</port>
+          <database>busca</database>
+        </serverInfo>
+        <databaseInfo>
+          <title lang="pt" primary="true">LexML Brasil</title>
+          <description lang="pt">Rede de informação legislativa e jurídica</description>
+        </databaseInfo>
+        <metaInfo>
+          <meta type="schema">dc</meta>
+          <meta type="schema">marc</meta>
+        </metaInfo>
+      </explain>
+    </recordData>
+    <recordPosition>1</recordPosition>
+  </record>
+</explainResponse>

@@ -1,0 +1,29 @@
+[project]
+name = "lexml-mcp"
+version = "0.2.0"
+description = "MCP server for LexML Brasil — SRU search, URN resolution, and explain"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.7.0",
+    "httpx>=0.27.0",
+    "defusedxml>=0.7.1",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+lexml-mcp = "lexml_mcp.server:main"
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

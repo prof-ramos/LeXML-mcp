@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<searchRetrieveResponse xmlns="http://www.loc.gov/zing/srw/">
+  <version>1.2</version>
+  <numberOfRecords>42</numberOfRecords>
+  <nextRecordPosition>11</nextRecordPosition>
+  <records>
+    <record>
+      <recordSchema>dc</recordSchema>
+      <recordPacking>xml</recordPacking>
+      <recordData>
+        <dc xmlns="http://purl.org/dc/elements/1.1/">
+          <title>Código de Defesa do Consumidor</title>
+          <identifier>urn:lex:br:federal:lei:1990-09-11;8078</identifier>
+          <date>1990-09-11</date>
+          <type>lei</type>
+        </dc>
+      </recordData>
+      <recordPosition>1</recordPosition>
+    </record>
+    <record>
+      <recordSchema>dc</recordSchema>
+      <recordPacking>xml</recordPacking>
+      <recordData>
+        <dc xmlns="http://purl.org/dc/elements/1.1/">
+          <title>Constituição da República Federativa do Brasil de 1988</title>
+          <identifier>urn:lex:br:federal:constituicao:1988-10-05;1988</identifier>
+          <date>1988-10-05</date>
+          <type>constituicao</type>
+        </dc>
+      </recordData>
+      <recordPosition>2</recordPosition>
+    </record>
+  </records>
+</searchRetrieveResponse>
