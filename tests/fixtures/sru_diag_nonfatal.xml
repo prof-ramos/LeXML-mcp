@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<searchRetrieveResponse xmlns="http://www.loc.gov/zing/srw/"
+                        xmlns:diag="http://www.loc.gov/zing/srw/diagnostic/">
+  <version>1.2</version>
+  <numberOfRecords>5</numberOfRecords>
+  <records>
+    <record>
+      <recordSchema>dc</recordSchema>
+      <recordPacking>xml</recordPacking>
+      <recordData>
+        <dc xmlns="http://purl.org/dc/elements/1.1/">
+          <title>Resultado parcial</title>
+        </dc>
+      </recordData>
+      <recordPosition>1</recordPosition>
+    </record>
+  </records>
+  <diagnostics>
+    <diag:diagnostic>
+      <diag:uri>info:srw/diagnostic/1/59</diag:uri>
+      <diag:message>Result set too large, truncated</diag:message>
+    </diag:diagnostic>
+  </diagnostics>
+</searchRetrieveResponse>

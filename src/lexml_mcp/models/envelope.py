@@ -33,6 +33,9 @@ _ERROR_TYPE_MAP = {
     "timeout": "UPSTREAM_TIMEOUT",
     "invalid_xml": "INVALID_XML",
     "http_error": "UPSTREAM_HTTP_ERROR",
+    "invalid_input": "INVALID_INPUT",
+    "invalid_record_schema": "INVALID_RECORD_SCHEMA",
+    "response_too_large": "RESPONSE_TOO_LARGE",
 }
 
 
@@ -59,7 +62,7 @@ def make_envelope(result: dict[str, Any], operation: str) -> dict[str, Any]:
         errors.append({
             "code": _map_error_type(error_type),
             "message": error_msg,
-            "retryable": error_type in ("timeout", "network_error"),
+            "retryable": error_type in ("timeout", "network_error", "response_too_large"),
             "details": result.get("details"),
             "record_position": None,
         })

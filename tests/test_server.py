@@ -288,10 +288,23 @@ class TestServerTools:
         with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=mock_resp)):
             from lexml_mcp.connectors.acervo import resolve_urn
 
-            result = await resolve_urn("urn:lex:br:federal:lei:1990-09-11;8078")
+            result = await resolve_urn("urn:lex:br:federal:lei:1990-09-11;8078", verify=True)
             assert result["urn"] == "urn:lex:br:federal:lei:1990-09-11;8078"
             assert result["status_code"] == 200
             assert "provenance" in result
+
+    @pytest.mark.asyncio
+    async def test_lexml_resolve_urn_no_verify(self):
+        """URN resolution without verify — no network call."""
+        from lexml_mcp.connectors.acervo import resolve_urn
+
+        result = await resolve_urn("urn:lex:br:federal:lei:1990-09-11;8078", verify=False)
+        assert result["urn"] == "urn:lex:br:federal:lei:1990-09-11;8078"
+        assert "public_url" in result
+        assert result["public_url"] == "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:1990-09-11;8078"
+        assert "provenance" in result
+        # No network call, so no status_code
+        assert "status_code" not in result
 
     @pytest.mark.asyncio
     async def test_lexml_resolve_urn_timeout(self):
@@ -302,7 +315,7 @@ class TestServerTools:
         ):
             from lexml_mcp.connectors.acervo import resolve_urn
 
-            result = await resolve_urn("urn:lex:br:federal:lei:1990-09-11;8078")
+            result = await resolve_urn("urn:lex:br:federal:lei:1990-09-11;8078", verify=True)
             assert result["error"] is True
             assert result["error_type"] == "timeout"
             assert "provenance" in result
@@ -646,6 +659,329 @@ class TestServerRegistration:
 
         resources = mcp._resource_manager._resources
         assert "lexml://sru/explain" in resources
+
+
+# ── New tests: field_values ────────────────────────────────────────────
+
+
+class TestFieldValues:
+    def test_field_values_in_parse(self):
+        """field_values is a dict[str, list[str]] alongside data."""
+        body = _load("sru_success.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        for rec in result["records"]:
+            assert "field_values" in rec
+            assert isinstance(rec["field_values"], dict)
+            for key, vals in rec["field_values"].items():
+                assert isinstance(vals, list)
+                assert len(vals) >= 1
+            # data still present for backward compat
+            assert "data" in rec
+
+    def test_field_values_multi_title(self):
+        """sru_multi_title has 2 titles in field_values."""
+        body = _load("sru_multi_title.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        assert len(result["records"]) == 1
+        fv = result["records"][0]["field_values"]
+        assert fv["title"] == ["Lei Principal", "Lei Alterada"]
+
+    def test_field_values_multi_id(self):
+        """sru_multi_id has 2 identifiers in field_values."""
+        body = _load("sru_multi_id.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        assert len(result["records"]) == 1
+        fv = result["records"][0]["field_values"]
+        assert len(fv["identifier"]) == 2
+
+
+# ── New tests: New error codes ─────────────────────────────────────────
+
+
+class TestNewErrorCodes:
+    def test_invalid_record_schema_exists(self):
+        from lexml_mcp.models.error import INVALID_RECORD_SCHEMA
+        assert INVALID_RECORD_SCHEMA.code == "INVALID_RECORD_SCHEMA"
+        assert INVALID_RECORD_SCHEMA.retryable is False
+
+    def test_payload_too_large_exists(self):
+        from lexml_mcp.models.error import PAYLOAD_TOO_LARGE
+        assert PAYLOAD_TOO_LARGE.code == "PAYLOAD_TOO_LARGE"
+
+    def test_response_too_large_exists(self):
+        from lexml_mcp.models.error import RESPONSE_TOO_LARGE
+        assert RESPONSE_TOO_LARGE.code == "RESPONSE_TOO_LARGE"
+
+    def test_upstream_rate_limited_exists(self):
+        from lexml_mcp.models.error import UPSTREAM_RATE_LIMITED
+        assert UPSTREAM_RATE_LIMITED.code == "UPSTREAM_RATE_LIMITED"
+        assert UPSTREAM_RATE_LIMITED.retryable is True
+
+    def test_unsafe_redirect_exists(self):
+        from lexml_mcp.models.error import UNSAFE_REDIRECT
+        assert UNSAFE_REDIRECT.code == "UNSAFE_REDIRECT"
+
+    def test_empty_response_exists(self):
+        from lexml_mcp.models.error import EMPTY_RESPONSE
+        assert EMPTY_RESPONSE.code == "EMPTY_RESPONSE"
+        assert EMPTY_RESPONSE.retryable is True
+
+    def test_unexpected_content_exists(self):
+        from lexml_mcp.models.error import UNEXPECTED_CONTENT
+        assert UNEXPECTED_CONTENT.code == "UNEXPECTED_CONTENT"
+
+    def test_record_parse_error_exists(self):
+        from lexml_mcp.models.error import RECORD_PARSE_ERROR
+        assert RECORD_PARSE_ERROR.code == "RECORD_PARSE_ERROR"
+
+    def test_cache_error_exists(self):
+        from lexml_mcp.models.error import CACHE_ERROR
+        assert CACHE_ERROR.code == "CACHE_ERROR"
+
+    def test_all_18_error_codes(self):
+        from lexml_mcp.models.error import (
+            INVALID_INPUT, INVALID_CQL, INVALID_URN,
+            UPSTREAM_CHALLENGE, UPSTREAM_TIMEOUT, UPSTREAM_HTTP_ERROR,
+            INVALID_XML, SRU_DIAGNOSTIC, INTERNAL_ERROR,
+            INVALID_RECORD_SCHEMA, PAYLOAD_TOO_LARGE, RESPONSE_TOO_LARGE,
+            UPSTREAM_RATE_LIMITED, UNSAFE_REDIRECT, EMPTY_RESPONSE,
+            UNEXPECTED_CONTENT, RECORD_PARSE_ERROR, CACHE_ERROR,
+        )
+        codes = [
+            INVALID_INPUT, INVALID_CQL, INVALID_URN,
+            UPSTREAM_CHALLENGE, UPSTREAM_TIMEOUT, UPSTREAM_HTTP_ERROR,
+            INVALID_XML, SRU_DIAGNOSTIC, INTERNAL_ERROR,
+            INVALID_RECORD_SCHEMA, PAYLOAD_TOO_LARGE, RESPONSE_TOO_LARGE,
+            UPSTREAM_RATE_LIMITED, UNSAFE_REDIRECT, EMPTY_RESPONSE,
+            UNEXPECTED_CONTENT, RECORD_PARSE_ERROR, CACHE_ERROR,
+        ]
+        assert len(codes) == 18
+
+
+# ── New tests: Logging ─────────────────────────────────────────────────
+
+
+class TestLogging:
+    def test_get_logger(self):
+        from lexml_mcp.utils.logging import get_logger
+        log = get_logger("test")
+        assert log.name == "test"
+        # Logger level is NOTSET (0) by default, effective level is WARNING
+        assert log.getEffectiveLevel() > 0
+
+    def test_make_request_id(self):
+        from lexml_mcp.utils.logging import make_request_id
+        rid = make_request_id()
+        assert isinstance(rid, str)
+        assert len(rid) == 12
+
+    def test_json_formatter(self):
+        from lexml_mcp.utils.logging import JsonFormatter
+        import logging
+        fmt = JsonFormatter()
+        rec = logging.LogRecord("test", logging.INFO, "", 0, "hello", (), None)
+        out = fmt.format(rec)
+        assert '"message": "hello"' in out
+        assert '"level": "INFO"' in out
+
+
+# ── New tests: Query validation ────────────────────────────────────────
+
+
+class TestQueryValidation:
+    def test_validate_query_ok(self):
+        from lexml_mcp.connectors.acervo import validate_query
+        assert validate_query("dc.title any 'test'") is None
+
+    def test_validate_query_too_long(self):
+        from lexml_mcp.connectors.acervo import validate_query
+        long_q = "x" * 5000
+        err = validate_query(long_q)
+        assert err is not None
+        assert "max length" in err
+
+    def test_validate_record_schema_ok(self):
+        from lexml_mcp.connectors.acervo import validate_record_schema
+        assert validate_record_schema("dc") is None
+        assert validate_record_schema("oai_dc") is None
+
+    def test_validate_record_schema_invalid(self):
+        from lexml_mcp.connectors.acervo import validate_record_schema
+        err = validate_record_schema("marc21")
+        assert err is not None
+        assert "marc21" in err
+
+
+# ── New tests: Response size limit ─────────────────────────────────────
+
+
+class TestResponseSizeLimit:
+    @pytest.mark.asyncio
+    async def test_response_too_large(self):
+        """Mock a response that exceeds the size limit."""
+        # Temporarily lower the limit
+        import lexml_mcp.config as cfg
+        original = cfg.LEXML_HTTP_MAX_RESPONSE_BYTES
+        cfg.LEXML_HTTP_MAX_RESPONSE_BYTES = 10
+        try:
+            mock_resp = AsyncMock()
+            mock_resp.status_code = 200
+            mock_resp.headers = {"content-type": "application/xml"}
+            mock_resp.text = "x" * 100  # > 10 bytes
+
+            with patch("httpx.AsyncClient.get", new=AsyncMock(return_value=mock_resp)):
+                from lexml_mcp.connectors.acervo import sru_search
+                result = await sru_search(query="dc.title any 'test'")
+                assert result["error"] is True
+                assert result["error_type"] == "response_too_large"
+        finally:
+            cfg.LEXML_HTTP_MAX_RESPONSE_BYTES = original
+
+
+# ── New tests: Retries ─────────────────────────────────────────────────
+
+
+class TestRetries:
+    def test_should_retry_timeout(self):
+        from lexml_mcp.connectors.acervo import _should_retry
+        assert _should_retry(__import__("httpx").TimeoutException("timeout")) is True
+
+    def test_should_retry_5xx(self):
+        from lexml_mcp.connectors.acervo import _should_retry
+        import httpx
+        resp = httpx.Response(503)
+        exc = httpx.HTTPStatusError("503", request=httpx.Request("GET", "http://x.com"), response=resp)
+        assert _should_retry(exc) is True
+
+    def test_should_not_retry_4xx(self):
+        from lexml_mcp.connectors.acervo import _should_retry
+        import httpx
+        resp = httpx.Response(400)
+        exc = httpx.HTTPStatusError("400", request=httpx.Request("GET", "http://x.com"), response=resp)
+        assert _should_retry(exc) is False
+
+
+# ── New tests: Debug raw responses ─────────────────────────────────────
+
+
+class TestDebugRaw:
+    def test_sanitize_excerpt_strips_scripts(self):
+        from lexml_mcp.connectors.acervo import _sanitize_excerpt
+        body = "<root><script>alert('xss')</script>safe</root>"
+        out = _sanitize_excerpt(body, 100)
+        assert "alert" not in out
+        assert "safe" in out
+
+    def test_sanitize_excerpt_truncates(self):
+        from lexml_mcp.connectors.acervo import _sanitize_excerpt
+        out = _sanitize_excerpt("x" * 200, 50)
+        assert len(out) == 50
+
+
+# ── New tests: New fixtures ────────────────────────────────────────────
+
+
+class TestNewFixtures:
+    def test_sru_namespace_parses(self):
+        body = _load("sru_namespace.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        assert len(result["records"]) == 1
+        assert "custom" in result["records"][0]["data"]
+
+    def test_sru_unknown_parses(self):
+        body = _load("sru_unknown.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        assert len(result["records"]) == 1
+        assert result["records"][0]["data"].get("unknownField") == "valor inesperado"
+
+    def test_sru_deep_parses(self):
+        body = _load("sru_deep.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        assert len(result["records"]) == 1
+        # Deep nested elements get flattened
+        assert "nested" in result["records"][0]["data"]
+
+    def test_sru_diag_fatal(self):
+        body = _load("sru_diag_fatal.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        assert len(result["diagnostics"]) == 1
+        assert "Query syntax error" in result["diagnostics"][0]["message"]
+
+    def test_sru_diag_nonfatal(self):
+        body = _load("sru_diag_nonfatal.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        assert len(result["diagnostics"]) == 1
+        assert len(result["records"]) == 1
+        assert result["number_of_records"] == 5
+
+    def test_empty_response_parses(self):
+        body = _load("empty_response.xml")
+        from defusedxml import ElementTree as ET
+        root = ET.fromstring(body)
+        provenance = Provenance.build(url="https://example.com/SRU", body=body)
+        result = _parse_sru_response(
+            "https://example.com/SRU", root, body, "application/xml", provenance
+        )
+        assert result["number_of_records"] == 0
+        assert len(result["records"]) == 0
+
+
+# ── New tests: Config ──────────────────────────────────────────────────
+
+
+class TestNewConfig:
+    def test_new_config_values_exist(self):
+        import lexml_mcp.config as cfg
+        assert cfg.LEXML_HTTP_CONNECT_TIMEOUT == 5.0
+        assert cfg.LEXML_HTTP_READ_TIMEOUT == 20.0
+        assert cfg.LEXML_HTTP_MAX_RESPONSE_BYTES == 5242880
+        assert cfg.LEXML_HTTP_MAX_RETRIES == 2
+        assert cfg.LEXML_QUERY_MAX_LENGTH == 4096
+        assert cfg.LEXML_MAXIMUM_RECORDS_LIMIT == 50
+        assert cfg.LEXML_DEBUG_RAW_RESPONSES is False
+        assert cfg.LEXML_RAW_EXCERPT_MAX_CHARS == 1024
+        assert cfg.LEXML_LOG_LEVEL == "INFO"
+        assert cfg.LEXML_USER_AGENT == "lexml-mcp/0.2.0"
 
 
 if __name__ == "__main__":

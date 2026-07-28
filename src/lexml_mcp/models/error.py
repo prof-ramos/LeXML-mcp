@@ -78,6 +78,15 @@ UPSTREAM_HTTP_ERROR = ErrorCode("UPSTREAM_HTTP_ERROR", "Upstream returned an HTT
 INVALID_XML = ErrorCode("INVALID_XML", "Invalid XML from upstream", retryable=False)
 SRU_DIAGNOSTIC = ErrorCode("SRU_DIAGNOSTIC", "SRU diagnostic returned", retryable=False)
 INTERNAL_ERROR = ErrorCode("INTERNAL_ERROR", "Internal server error", retryable=False)
+INVALID_RECORD_SCHEMA = ErrorCode("INVALID_RECORD_SCHEMA", "Invalid record schema", retryable=False)
+PAYLOAD_TOO_LARGE = ErrorCode("PAYLOAD_TOO_LARGE", "Request payload too large", retryable=False)
+RESPONSE_TOO_LARGE = ErrorCode("RESPONSE_TOO_LARGE", "Upstream response exceeded size limit", retryable=False)
+UPSTREAM_RATE_LIMITED = ErrorCode("UPSTREAM_RATE_LIMITED", "Upstream rate limited the request", retryable=True)
+UNSAFE_REDIRECT = ErrorCode("UNSAFE_REDIRECT", "Redirect target not allowed", retryable=False)
+EMPTY_RESPONSE = ErrorCode("EMPTY_RESPONSE", "Upstream returned an empty response", retryable=True)
+UNEXPECTED_CONTENT = ErrorCode("UNEXPECTED_CONTENT", "Unexpected content from upstream", retryable=False)
+RECORD_PARSE_ERROR = ErrorCode("RECORD_PARSE_ERROR", "Failed to parse a record", retryable=False)
+CACHE_ERROR = ErrorCode("CACHE_ERROR", "Cache operation failed", retryable=False)
 
 
 def error_code_to_dict(code: ErrorCode, details: dict | None = None, record_position: int | None = None) -> dict:

@@ -77,7 +77,7 @@ async def lexml_search(
         query: CQL query string (e.g. 'dc.title any "constituição"')
         start_record: First record position (default 1)
         maximum_records: Max records to return (default 10, max 100)
-        record_schema: Record schema (default 'dc')
+        record_schema: Record schema (default 'dc', allowed: dc, oai_dc)
         filters: Structured filters {title, terms[], document_type, authority, date_from, date_to}.
                  Mutually exclusive with query. When provided, generates safe CQL.
     """
@@ -116,6 +116,23 @@ async def lexml_search(
             )
 
     assert query is not None  # guaranteed by mutual exclusivity check above
+
+    # Query validation
+    q_err = acervo.validate_query(query)
+    if q_err:
+        return make_envelope(
+            {"error": True, "error_type": "invalid_input", "error_message": q_err},
+            "lexml_search",
+        )
+
+    # Record schema validation
+    s_err = acervo.validate_record_schema(record_schema)
+    if s_err:
+        return make_envelope(
+            {"error": True, "error_type": "invalid_record_schema", "error_message": s_err},
+            "lexml_search",
+        )
+
     maximum_records = min(maximum_records, 100)  # ponytail: server-side cap
     cache_key = f"search:{query}:{start_record}:{maximum_records}:{record_schema}"
     cached = _cache.get(cache_key)
@@ -136,19 +153,21 @@ async def lexml_search(
 
 
 @mcp.tool()
-async def lexml_resolve_urn(urn: str) -> dict:
+async def lexml_resolve_urn(urn: str, verify: bool = False) -> dict:
     """Resolve a LexML URN to its public URL.
 
     Args:
         urn: LexML URN (e.g. 'urn:lex:br:federal:lei:1990-09-11;8078')
+        verify: If True, follow redirects and validate final host (SSRF guard).
+                Default False — only constructs the URL without network call.
     """
-    cache_key = f"urn:{urn}"
+    cache_key = f"urn:{urn}:{verify}"
     cached = _cache.get(cache_key)
     if cached is not None:
         cached["cache_status"] = "hit"
         return make_envelope(cached, "lexml_resolve_urn")
 
-    result = await acervo.resolve_urn(urn)
+    result = await acervo.resolve_urn(urn, verify=verify)
     _cache.set(cache_key, result)
     result["cache_status"] = "miss"
     return make_envelope(result, "lexml_resolve_urn")
